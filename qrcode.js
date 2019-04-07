@@ -96,6 +96,12 @@ var QRCode;
             }
             return this.modules[row][col].dark;
         },
+        getPositionTagIdx: function(row, col) {
+            if (row < 0 || this.moduleCount <= row || col < 0 || this.moduleCount <= col) {
+                throw new Error(row + "," + col);
+            }
+            return this.modules[row][col].positionProbeIdx;
+        },
         getType: function(row, col) {
             if (row < 0 || this.moduleCount <= row || col < 0 || this.moduleCount <= col) {
                 throw new Error(row + "," + col);
@@ -131,7 +137,7 @@ var QRCode;
             }
             this.mapData(this.dataCache, maskPattern);
         },
-        setupPositionProbePattern: function(row, col) {
+        setupPositionProbePattern: function(row, col, positionProbeIdx) {
             for (var r = -1; r <= 7; r++) {
                 if (row + r <= -1 || this.moduleCount <= row + r)
                     continue;
@@ -139,9 +145,9 @@ var QRCode;
                     if (col + c <= -1 || this.moduleCount <= col + c)
                         continue;
                     if ((0 <= r && r <= 6 && (c == 0 || c == 6)) || (0 <= c && c <= 6 && (r == 0 || r == 6)) || (2 <= r && r <= 4 && 2 <= c && c <= 4)) {
-                        this.modules[row + r][col + c] = {dark: true, type: 'position'};
+                        this.modules[row + r][col + c] = {dark: true, type: 'position', positionProbeIdx: positionProbeIdx};
                     } else {
-                        this.modules[row + r][col + c] = {dark: false, type: 'position'};
+                        this.modules[row + r][col + c] = {dark: false, type: 'position', positionProbeIdx, positionProbeIdx};
                     }
                 }
             }
@@ -206,9 +212,9 @@ var QRCode;
                     for (var r = -2; r <= 2; r++) {
                         for (var c = -2; c <= 2; c++) {
                             if (r == -2 || r == 2 || c == -2 || c == 2 || (r == 0 && c == 0)) {
-                                this.modules[row + r][col + c] = {dark: true, type: 'postitionAdjust'};
+                                this.modules[row + r][col + c] = {dark: true, type: 'positionAdjust'};
                             } else {
-                                this.modules[row + r][col + c] = {dark: false, type: 'postitionAdjust'};
+                                this.modules[row + r][col + c] = {dark: false, type: 'positionAjdust'};
                             }
                         }
                     }
@@ -984,6 +990,9 @@ var QRCode;
             var logoRight = logoLeft + logoWidth;
             var logoBottom = logoTop + logoHeight;
 
+            var initProbe = {xmin: Infinity, xmax: -Infinity, ymin: Infinity, ymax: -Infinity};
+            var positionProbes = [Object.assign({}, initProbe), Object.assign({}, initProbe), Object.assign({}, initProbe)];
+
             for (var row = 0; row < nCount; row++) {
                 for (var col = 0; col < nCount; col++) {
                     var bIsDark = oQRCode.isDark(row, col);
@@ -1000,7 +1009,7 @@ var QRCode;
 
                         if (left - radius >= logoLeft && left + radius <= logoRight &&
                             top - radius >= logoTop && top + radius <= logoTop) {
-                            // don't draw points under logo
+                            // don't draw points under the logo
                             continue;
                         }
 
@@ -1008,19 +1017,51 @@ var QRCode;
                         _oContext.arc(left, top, Math.max(1, Math.floor(nWidth / 2) - 1), 0, 2 * Math.PI);
                         _oContext.fill();
                         _oContext.stroke();
-                    } else {
-                        _oContext.fillRect(nLeft, nTop, nWidth, nHeight);
-                        _oContext.strokeRect(Math.floor(nLeft) + 0.5, Math.floor(nTop) + 0.5, nRoundedWidth, nRoundedHeight);
-                        _oContext.strokeRect(Math.ceil(nLeft) - 0.5, Math.ceil(nTop) - 0.5, nRoundedWidth, nRoundedHeight);
                     }
                 }
             }
+            
+            var nLeft = col * nWidth;
+            var nTop = row * nHeight;
+            var radius = 11;
+
+            this._drawPositionProbe(0, 0, radius, nWidth, nHeight);
+            this._drawPositionProbe(oQRCode.moduleCount - 7, 0, radius, nWidth, nHeight);
+            this._drawPositionProbe(0, oQRCode.moduleCount - 7, radius, nWidth, nHeight);
+
+            // draw logo
             var img = document.getElementById("logo");
             _oContext.drawImage(img, logoLeft, logoTop, logoWidth, logoHeight);
 
             this._bIsPainted = true;
+        };
+
+        Drawing.prototype._drawPositionProbe = function(row, col, radius, nWidth, nHeight) {
+            this._oContext.lineJoin = "round";
+            this._oContext.lineWidth = radius;
+
+            var margin = radius / 2;
+
+            this._oContext.beginPath();
+            this._oContext.moveTo((row + 2) * nWidth + margin, (col + 2) * nHeight + margin);
+            this._oContext.lineTo((row + 5) * nWidth - margin, (col + 2) * nHeight + margin);
+            this._oContext.lineTo((row + 5) * nWidth - margin, (col + 5) * nHeight - margin);
+            this._oContext.lineTo((row + 2) * nWidth + margin, (col + 5) * nHeight - margin);
+            this._oContext.lineTo((row + 2) * nWidth + margin, (col + 2) * nHeight + margin);
+            this._oContext.closePath();
+            this._oContext.stroke();
+            this._oContext.fill();
+
+            this._oContext.beginPath();
+            this._oContext.moveTo(row * nWidth + margin, col * nHeight + margin);
+            this._oContext.lineTo((row + 7) * nWidth - margin, col * nHeight + margin);
+            this._oContext.lineTo((row + 7) * nWidth - margin, (col + 7) * nHeight - margin);
+            this._oContext.lineTo(row * nWidth + margin, (col + 7) * nHeight - margin);
+            this._oContext.lineTo(row * nWidth + margin, col * nHeight + margin);
+            this._oContext.closePath();
+            this._oContext.stroke();
         }
-        ;
+
 
         /**
          * Make the image from Canvas if the browser supports Data URI.
